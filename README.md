@@ -5,6 +5,8 @@ playground when you touch it. One HTML file, no server, no account, no
 network calls — and every verse, every word and every tool in it comes from
 **[studytools.cc](https://studytools.cc)**.
 
+**See it running:** <https://kennethyork.github.io/ChristInBackground/> — the page GitHub Pages serves, built by the same workflow that builds the packages.
+
 ![the wallpaper](docs/thumbnail.jpg)
 
 Left alone it drifts: a verse, its reference, the clock, the site's name, a
