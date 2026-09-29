@@ -132,10 +132,15 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           set -e
-          files=$(find dist -maxdepth 1 -type f | sort | tr '\n' ' ')
-          echo "attaching: $files"
-          if ! gh release create "$TAG" \
+          # gh needs to be told which repository: this job has no checkout
+          REPO="${{ github.repository }}"
+          files=$(find dist -maxdepth 1 -type f \( -name '*.deb' -o -name '*.rpm' \
+                    -o -name '*.AppImage' -o -name '*.zip' -o -name '*.mp4' \
+                    -o -name 'index.html' -o -name 'SHA256SUMS' -o -name 'thumbnail.jpg' \
+                    -o -name 'preview.gif' \) | sort | tr '\n' ' ')
+          echo "attaching to $TAG: $files"
+          if ! gh release create "$TAG" --repo "$REPO" \
                 --title "Scripture — a studytools.cc live wallpaper ${TAG}" \
                 --generate-notes $files ; then
-            gh release upload "$TAG" $files --clobber
+            gh release upload "$TAG" $files --repo "$REPO" --clobber
           fi
