@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>Scripture &mdash; a studytools.cc screensaver</title>
+<meta name="description" content="A quiet screensaver of Scripture that you can play with — tap any word for the Greek or Hebrew behind it, hide the verse and test your memory, learn a catechism question, light a candle, and take up the day's challenge. Every word and every tool: studytools.cc.">
+<meta name="author" content="studytools.cc">
+<meta name="theme-color" content="#0b0908">
+<style>
+/* ------------------------------------------------------------------ *
+   Scripture screensaver  ·  studytools.cc
+   A quiet loop of Scripture that becomes a playground when you touch
+   it: the Greek or Hebrew behind a word, the verse hidden for memory,
+   a catechism question, a quick game, a candle, a challenge a day.
+   One self-contained file — no fonts to fetch, no scripts to load, no
+   network calls.  All the text it quotes is public domain, and it was
+   taken from the same files studytools.cc serves.
+ * ------------------------------------------------------------------ */
+
+:root{
+  --bg-1:#16110d; --bg-2:#0b0908;
+  --ink:#f2ebdf; --ink-soft:rgba(242,235,223,.62); --ink-faint:rgba(242,235,223,.34);
+  --gold:#e0ab6a; --gold-soft:rgba(224,171,106,.45); --gold-glow:rgba(224,171,106,.16);
+  --line:rgba(224,171,106,.22); --panel:rgba(20,16,13,.93); --panel-2:rgba(255,255,255,.045);
+  --veil:rgba(0,0,0,.5); --ok:#8fce9f; --no:#e59a86;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,"Times New Roman",serif;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --pad:clamp(16px,2.6vw,38px);
+  --verse-size:clamp(1.3rem,3.3vw,2.95rem);
+  --hold:24s;
+}
+html[data-theme="light"]{
+  --bg-1:#fbf7ef; --bg-2:#ece3d4;
+  --ink:#2b2320; --ink-soft:rgba(43,35,32,.74); --ink-faint:rgba(43,35,32,.48);
+  --gold:#9a6b31; --gold-soft:rgba(154,107,49,.42); --gold-glow:rgba(184,134,59,.13);
+  --line:rgba(154,107,49,.24); --panel:rgba(255,252,246,.95); --panel-2:rgba(43,35,32,.05);
+  --veil:rgba(255,255,255,.35); --ok:#2f7a4a; --no:#b4553c;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; min-height:100vh; min-height:100dvh; overflow:hidden;
+  background:radial-gradient(120% 95% at 50% 8%, var(--bg-1) 0%, var(--bg-2) 72%);
+  color:var(--ink); font-family:var(--sans);
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+}
+body.idle{cursor:none}
+html.still *,html.still *::before,html.still *::after{transition:none !important; animation:none !important}
+html.still .flame,html.still .playbar .dot{opacity:.9 !important}
+::selection{background:var(--gold-soft); color:var(--bg-2)}
+a{color:var(--gold)}
+
+/* --- background light --------------------------------------------- */
+.glow{position:fixed; inset:-20vmin; z-index:0; pointer-events:none;
+  background:radial-gradient(closest-side, var(--gold-glow), transparent 72%);
+  animation:breathe 21s ease-in-out infinite alternate}
+@keyframes breathe{from{opacity:.55; transform:scale(.94)} to{opacity:1; transform:scale(1.07)}}
+#dust{position:fixed; inset:0; z-index:1; pointer-events:none; opacity:.85}
+.vignette{position:fixed; inset:0; z-index:2; pointer-events:none;
+  background:radial-gradient(120% 85% at 50% 45%, transparent 42%, var(--veil) 100%)}
+
+/* --- the verse ----------------------------------------------------- */
+.stage{
+  position:relative; z-index:3; min-height:100vh; min-height:100dvh;
+  display:flex; flex-direction:column; justify-content:center; align-items:center;
+  padding:clamp(90px,14vh,150px) var(--pad) clamp(96px,15vh,160px);
+  text-align:center; transition:padding .5s ease;
+}
+body.panel .stage{padding-top:11vh; padding-bottom:56vh; justify-content:flex-start}
+#kb{width:100%; max-width:min(1180px,88vw); animation:kb var(--hold) linear forwards; will-change:transform}
+@keyframes kb{from{transform:scale(1) translate3d(0,0,0)} to{transform:scale(1.035) translate3d(0,-9px,0)}}
+#verse{margin:0; opacity:0; transform:translateY(16px);
+  transition:opacity 1.5s ease, transform 1.7s cubic-bezier(.22,.72,.2,1); will-change:opacity,transform}
+#verse.in{opacity:1; transform:none}
+#verse.out{opacity:0; transform:translateY(-12px); transition-duration:.9s}
+
+blockquote.verse-text{
+  margin:0; font-family:var(--serif); font-weight:400; font-size:var(--verse-size);
+  line-height:1.34; letter-spacing:.004em; text-wrap:balance; hyphens:none; color:var(--ink);
+  text-shadow:0 2px 40px rgba(0,0,0,.35);
+}
+html[data-theme="light"] blockquote.verse-text{text-shadow:0 2px 30px rgba(255,255,255,.6)}
+.w{display:inline}
+.wk{border-bottom:1px dotted var(--gold-soft); cursor:pointer; transition:background .2s ease}
+.wk:hover{background:rgba(224,171,106,.14); border-bottom-color:var(--gold)}
+.w.wrong{background:rgba(229,154,134,.22)}
+.w.hid{color:transparent; background:linear-gradient(var(--ink-soft),var(--ink-soft)) center/100% .78em no-repeat;
+  border-radius:3px; cursor:pointer; user-select:none; border-bottom:0}
+.w.hid:hover{background-size:100% 1.05em}
+
+figcaption{margin-top:clamp(18px,3vh,34px); display:flex; flex-direction:column; align-items:center; gap:10px}
+.ref-rule{width:clamp(40px,7vw,86px); height:1px; background:linear-gradient(90deg,transparent,var(--gold-soft),transparent)}
+.verse-ref{font-size:clamp(.72rem,1.05vw,.88rem); font-weight:700; letter-spacing:.26em;
+  text-transform:uppercase; color:var(--gold); text-decoration:none; border-bottom:1px solid transparent; padding-bottom:2px}
+.verse-ref:hover{border-bottom-color:var(--gold-soft)}
+.verse-src{font-size:clamp(.6rem,.85vw,.72rem); letter-spacing:.13em; text-transform:uppercase; color:var(--ink-faint)}
+
+#tip{
+  position:fixed; z-index:12; pointer-events:none; opacity:0; transform:translate(-50%,-100%) translateY(-8px);
+  transition:opacity .18s ease; padding:7px 11px; border-radius:10px; white-space:nowrap;
+  background:var(--panel); border:1px solid var(--line); box-shadow:0 8px 30px rgba(0,0,0,.45);
+  font-size:.72rem; letter-spacing:.02em; color:var(--ink-soft);
+}
+#tip.show{opacity:1}
+#tip b{color:var(--gold); font-family:var(--serif); font-size:.95rem; font-weight:400; letter-spacing:0}
+
+/* --- chrome -------------------------------------------------------- */
+.hud{position:fixed; z-index:5; display:flex; align-items:center; gap:16px; padding:var(--pad); transition:opacity .4s ease}
+.hud.top{top:0; left:0; right:0; justify-content:space-between; align-items:flex-start}
+.hud.bottom{bottom:0; left:0; right:0; justify-content:space-between; align-items:flex-end; gap:26px;
+  padding-bottom:clamp(96px,12.4vh,130px)}
+body.panel .hud.bottom{opacity:0; pointer-events:none}
+
+.brand{display:flex; align-items:center; gap:11px; text-decoration:none}
+.brand svg{width:clamp(18px,1.7vw,23px); height:auto; color:var(--gold); opacity:.9; flex:none}
+.wordmark{font-family:var(--serif); font-size:clamp(.86rem,1.15vw,1.06rem); font-weight:700;
+  letter-spacing:.06em; color:var(--ink-soft); white-space:nowrap}
+.wordmark b{color:var(--gold)}
+.brand:hover .wordmark{color:var(--ink)}
+
+.clock{text-align:right}
+#time{font-weight:200; font-variant-numeric:tabular-nums; font-size:clamp(1.5rem,3.1vw,2.7rem);
+  line-height:1; color:var(--ink-soft)}
+#date{margin-top:7px; font-size:clamp(.6rem,.85vw,.74rem); letter-spacing:.2em; text-transform:uppercase; color:var(--ink-faint)}
+
+#tagline{max-width:min(34ch,30vw); font-size:clamp(.74rem,1vw,.88rem); line-height:1.62;
+  color:var(--ink-soft); transition:opacity .8s ease}
+#tagline b{color:var(--gold); font-weight:600}
+#tagline em{font-style:normal; color:var(--ink)}
+#season{display:block; margin-bottom:6px; font-family:var(--serif); font-size:clamp(.76rem,1vw,.9rem);
+  color:var(--gold-soft); letter-spacing:.02em}
+#season a{color:inherit; text-decoration:none; border-bottom:1px solid transparent}
+#season a:hover{color:var(--gold); border-bottom-color:var(--line)}
+#streak{display:block; margin-bottom:8px; font-size:clamp(.62rem,.85vw,.74rem); letter-spacing:.14em;
+  text-transform:uppercase; color:var(--ink-faint)}
+#streak b{color:var(--gold); font-weight:700}
+
+.cta{display:inline-flex; align-items:center; gap:10px; flex:none; font-family:var(--serif);
+  font-size:clamp(.78rem,1.05vw,.96rem); font-weight:700; letter-spacing:.05em; color:var(--gold);
+  text-decoration:none; padding:9px clamp(14px,1.6vw,20px); border:1px solid var(--line);
+  border-radius:999px; background:rgba(224,171,106,.05); backdrop-filter:blur(3px)}
+.cta:hover{border-color:var(--gold-soft); background:rgba(224,171,106,.13)}
+.cta .arrow{transition:transform .25s ease}
+.cta:hover .arrow{transform:translateX(3px)}
+
+.progress{position:fixed; left:0; right:0; bottom:0; height:2px; z-index:6; background:rgba(242,235,223,.05)}
+.progress i{display:block; height:100%; width:0;
+  background:linear-gradient(90deg,transparent,var(--gold-soft) 30%,var(--gold));
+  animation:fill var(--hold) linear forwards}
+@keyframes fill{from{width:0} to{width:100%}}
+
+/* --- the play bar -------------------------------------------------- */
+.playbar{
+  position:fixed; left:50%; bottom:clamp(40px,6.2vh,64px); transform:translateX(-50%) translateY(8px);
+  z-index:8; display:flex; align-items:center; gap:2px; padding:6px 8px;
+  border:1px solid var(--line); border-radius:999px; background:var(--panel);
+  backdrop-filter:blur(12px); box-shadow:0 10px 40px rgba(0,0,0,.35);
+  opacity:0; pointer-events:none; transition:opacity .35s ease, transform .35s ease;
+}
+.playbar.show{opacity:1; pointer-events:auto; transform:translateX(-50%) translateY(0)}
+.playbar button, .playbar a{
+  appearance:none; border:0; background:transparent; color:var(--ink-soft); font:inherit;
+  font-size:.78rem; letter-spacing:.02em; cursor:pointer; border-radius:999px;
+  padding:8px 12px; display:inline-flex; align-items:center; gap:7px; text-decoration:none; white-space:nowrap;
+}
+.playbar button:hover,.playbar button:focus-visible,.playbar a:hover{background:rgba(224,171,106,.15); color:var(--ink)}
+.playbar button[aria-pressed="true"]{background:rgba(224,171,106,.2); color:var(--gold)}
+.playbar .sep{width:1px; height:18px; background:var(--line); margin:0 3px}
+.playbar .icon{font-size:.7rem}
+.playbar .dot{width:6px; height:6px; border-radius:50%; background:var(--gold); animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.35; transform:scale(.8)} 50%{opacity:1; transform:scale(1)}}
+
+#hint{position:fixed; left:50%; bottom:clamp(96px,12.6vh,140px); transform:translateX(-50%); z-index:6;
+  font-size:.7rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint);
+  white-space:nowrap; transition:opacity 1s ease; pointer-events:none; text-align:center}
+#hint.gone{opacity:0}
+
+/* --- the sheet (panels) -------------------------------------------- */
+.sheet{
+  position:fixed; left:50%; bottom:clamp(12px,3vh,34px); transform:translateX(-50%) translateY(14px);
+  width:min(900px,94vw); max-height:min(58vh,580px); overflow:auto; z-index:9;
+  background:var(--panel); border:1px solid var(--line); border-radius:20px;
+  box-shadow:0 24px 70px rgba(0,0,0,.5); backdrop-filter:blur(16px);
+  padding:clamp(16px,2.2vw,26px); opacity:0; pointer-events:none; transition:opacity .3s ease, transform .3s ease;
+}
+.sheet.show{opacity:1; pointer-events:auto; transform:translateX(-50%) translateY(0)}
+.sheet h2{font-family:var(--serif); font-size:clamp(1rem,1.5vw,1.3rem); margin:0 0 2px; letter-spacing:.01em}
+.sheet h2 .n{color:var(--gold); font-size:.72em; letter-spacing:.16em; text-transform:uppercase; display:block; margin-bottom:6px}
+.sheet .sub{font-size:.72rem; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-faint); margin:0 0 14px}
+.sheet .row{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+.sheet .grow{flex:1}
+.sheet p{line-height:1.6}
+.sheet .note{font-size:.74rem; color:var(--ink-faint); margin:14px 0 0; line-height:1.5}
+.sheet .note a{color:var(--gold-soft); text-decoration:none; border-bottom:1px solid var(--line)}
+.sheet .note a:hover{color:var(--gold)}
+.x{position:absolute; top:12px; right:14px; border:0; background:transparent; color:var(--ink-faint);
+  font:inherit; font-size:1rem; cursor:pointer; padding:6px 9px; border-radius:9px; line-height:1}
+.x:hover{background:rgba(224,171,106,.15); color:var(--ink)}
+.btn{appearance:none; font:inherit; font-size:.8rem; cursor:pointer; border-radius:999px;
+  padding:9px 15px; border:1px solid var(--line); background:var(--panel-2); color:var(--ink-soft)}
+.btn:hover{border-color:var(--gold-soft); color:var(--ink)}
+.btn.gold{color:var(--gold); border-color:var(--gold-soft)}
+.btn.on{background:rgba(224,171,106,.2); color:var(--gold)}
+.tabs{display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap}
+
+/* words panel */
+.orig{display:flex; flex-wrap:wrap; gap:8px; margin:0 0 16px}
+.chip{border:1px solid var(--line); border-radius:12px; padding:8px 11px; background:var(--panel-2);
+  cursor:pointer; text-align:left; font:inherit; color:var(--ink); min-width:74px}
+.chip:hover{border-color:var(--gold-soft)}
+.chip.on{border-color:var(--gold); background:rgba(224,171,106,.14)}
+.chip .en{display:block; font-size:.6rem; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--ink-faint); margin:-1px 0 4px}
+.chip.on .en{color:var(--gold)}
+.chip .g{display:block; font-size:1.12rem; line-height:1.25; font-family:var(--serif)}
+.chip .t{display:block; font-size:.66rem; letter-spacing:.06em; color:var(--gold); margin-top:2px}
+.chip .e{display:block; font-size:.68rem; color:var(--ink-faint); margin-top:2px; max-width:15ch}
+.detail{border:1px solid var(--line); border-radius:14px; padding:14px 16px; background:var(--panel-2)}
+.detail .big{font-family:var(--serif); font-size:clamp(1.5rem,2.6vw,2.1rem); line-height:1.2}
+.detail .tr{color:var(--gold); font-size:.82rem; letter-spacing:.06em; margin-top:4px}
+.detail .gl{font-size:.95rem; margin-top:10px}
+.detail .meta{font-size:.72rem; color:var(--ink-faint); margin-top:8px; line-height:1.6}
+.detail .meta b{color:var(--ink-soft); font-weight:600}
+
+/* catechism */
+.cat-q{font-family:var(--serif); font-size:clamp(1.15rem,2vw,1.6rem); line-height:1.4; margin:6px 0 0}
+.cat-a{font-family:var(--serif); font-size:clamp(1rem,1.6vw,1.28rem); line-height:1.55; color:var(--gold);
+  margin:14px 0 0; padding-top:14px; border-top:1px solid var(--line)}
+.cat-a.hidden{display:none}
+.cat-hidden{color:var(--ink-faint); font-size:.9rem; font-family:var(--sans); margin-top:14px}
+
+/* games */
+.opts{display:grid; gap:9px; margin-top:4px}
+.opt{appearance:none; font:inherit; text-align:left; cursor:pointer; border-radius:14px;
+  padding:13px 16px; border:1px solid var(--line); background:var(--panel-2); color:var(--ink); line-height:1.5; font-size:.92rem}
+.opt:hover:not(.done){border-color:var(--gold-soft); background:rgba(224,171,106,.09)}
+.opt.right{border-color:var(--ok); background:rgba(143,206,159,.14)}
+.opt.wrong{border-color:var(--no); background:rgba(229,154,134,.12)}
+.opt.done{cursor:default}
+.qtext{font-family:var(--serif); font-size:clamp(1.05rem,1.7vw,1.35rem); line-height:1.45; margin:0 0 14px}
+.qtext .blank{color:var(--gold)}
+.score{font-size:.74rem; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-faint)}
+.score b{color:var(--gold)}
+
+/* pray */
+.candle{display:flex; align-items:center; gap:16px; margin-bottom:16px}
+.candle svg{width:52px; height:80px; flex:none}
+.flame{transition:opacity .5s ease}
+.candle.lit .flame{animation:flicker 3.2s ease-in-out infinite}
+@keyframes flicker{0%,100%{transform:scale(1) translateY(0) ; opacity:.95}
+  30%{transform:scale(1.05,.96) translateY(-1px); opacity:1}
+  60%{transform:scale(.97,1.03) translateY(1px); opacity:.9}}
+.ring{width:34px; height:34px; flex:none}
+.ring circle{fill:none; stroke-width:3}
+.ring .bg{stroke:var(--line)}
+.ring .fg{stroke:var(--gold); stroke-linecap:round; transition:stroke-dashoffset .95s linear}
+.stats{display:flex; gap:22px; flex-wrap:wrap; margin-top:18px; padding-top:16px; border-top:1px solid var(--line)}
+.stats div b{display:block; font-family:var(--serif); font-size:1.3rem; color:var(--gold)}
+.stats div span{font-size:.68rem; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-faint)}
+
+/* grow: the fruit of the Spirit and the armour of God, a tap at a time */
+.growgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(148px,1fr)); gap:8px}
+.growgrid .chip{min-width:0}
+.gchip-n{display:block; font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint)}
+.growgrid .chip.on{border-color:var(--gold); background:rgba(224,171,106,.14)}
+.growgrid .chip.on .gchip-n{color:var(--gold)}
+.growgrid .chip .g{font-size:.98rem; font-family:var(--sans); font-weight:600; letter-spacing:0}
+.growgrid .chip .e{max-width:none}
+.progressline{font-size:.72rem; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-faint); margin:0 0 12px}
+.progressline b{color:var(--gold)}
+
+/* the dove, for a thing done well */
+#dove{position:fixed; z-index:11; top:22vh; left:-14vw; width:clamp(70px,7vw,110px); pointer-events:none; opacity:0}
+#dove.fly{animation:fly 5.6s cubic-bezier(.4,.05,.6,.95) forwards}
+#dove svg{width:100%; height:auto; color:var(--gold); filter:drop-shadow(0 6px 22px rgba(224,171,106,.35))}
+#dove path{fill:currentColor}
+@keyframes fly{
+  0%{opacity:0; transform:translate(0,0) rotate(-3deg)}
+  12%{opacity:.95}
+  35%{transform:translate(38vw,-7vh) rotate(2deg)}
+  65%{transform:translate(72vw,5vh) rotate(-2deg)}
+  88%{opacity:.9}
+  100%{opacity:0; transform:translate(125vw,-4vh) rotate(3deg)}
+}
+
+#toast{position:fixed; left:50%; bottom:clamp(108px,14vh,150px); transform:translateX(-50%) translateY(8px);
+  z-index:12; background:var(--panel); border:1px solid var(--line); border-radius:999px;
+  padding:10px 18px; font-size:.84rem; color:var(--ink); opacity:0; pointer-events:none;
+  transition:opacity .3s ease, transform .3s ease; backdrop-filter:blur(10px); text-align:center}
+#toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+#toast b{color:var(--gold)}
+#amen{position:fixed; inset:0; z-index:11; display:flex; align-items:center; justify-content:center;
+  pointer-events:none; opacity:0}
+#amen span{font-family:var(--serif); font-size:clamp(2.4rem,7vw,5rem); letter-spacing:.22em; color:var(--gold)}
+#amen.show{animation:amen 2.2s ease forwards}
+@keyframes amen{0%{opacity:0; transform:scale(.94)} 18%{opacity:.95} 70%{opacity:.95} 100%{opacity:0; transform:scale(1.02)}}
+.spark{position:fixed; z-index:13; pointer-events:none; width:6px; height:6px; border-radius:50%;
+  background:var(--gold); animation:spark .9s ease-out forwards}
+@keyframes spark{0%{opacity:.95; transform:translate(0,0) scale(1)}
+  100%{opacity:0; transform:translate(var(--dx),var(--dy)) scale(.2)}}
+
+@media (max-width:760px){
+  .hud.bottom{display:none}
+  #hint{display:none}
+  .sheet{max-height:62vh; width:96vw; bottom:8px}
+  body.panel .stage{padding-top:7vh; padding-bottom:66vh}
+  .stage{padding-bottom:34vh}
+  .playbar{left:10px; right:10px; bottom:10px; transform:none; max-width:none; width:auto;
+    flex-wrap:wrap; justify-content:center; gap:2px; border-radius:20px; padding:8px}
+  .playbar.show{transform:none}
+  .playbar button,.playbar a{font-size:.74rem; padding:7px 10px}
+  .playbar .sep{display:none}
+  #toast{left:12px; right:12px; transform:none; white-space:normal}
+  #toast.show{transform:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .glow,#kb,#verse,.flame,.playbar .dot{animation:none !important}
+  #verse{transition:none !important; transform:none !important}
+  #dust{display:none}
+  .spark{display:none}
+}
+@media print{#dust,.glow,.vignette,.hud,.playbar,.progress,#hint,.sheet{display:none}}
+</style>
+</head>
+<body>
+
+<div class="glow" aria-hidden="true"></div>
+<canvas id="dust" aria-hidden="true"></canvas>
+<div class="vignette" aria-hidden="true"></div>
+
+<header class="hud top">
+  <a class="brand" href="https://studytools.cc/" target="_blank" rel="noopener" title="studytools.cc — the source of this text">
+    <svg viewBox="0 0 24 32" fill="currentColor" aria-hidden="true"><path d="M10.4 1h3.2v7.1H21v3.2h-7.4V31h-3.2V11.3H3V8.1h7.4z"/></svg>
+    <span class="wordmark">studytools<b>.cc</b></span>
+  </a>
+  <div class="clock">
+    <div id="time">&nbsp;</div>
+    <div id="date">&nbsp;</div>
+  </div>
+</header>
+
+<main class="stage">
+  <div id="kb">
+    <figure id="verse" role="group" aria-label="Scripture, tap a word for the original">
+      <blockquote class="verse-text" id="text"></blockquote>
+      <figcaption>
+        <span class="ref-rule" aria-hidden="true"></span>
+        <a class="verse-ref" id="ref" href="https://studytools.cc/" target="_blank" rel="noopener"></a>
+        <span class="verse-src" id="src">World English Bible (Updated) &middot; public domain</span>
+      </figcaption>
+    </figure>
+  </div>
+</main>
+
+<footer class="hud bottom">
+  <div>
+    <span id="season"></span>
+    <span id="streak"></span>
+    <p id="tagline"></p>
+  </div>
+  <a class="cta" href="https://studytools.cc/" target="_blank" rel="noopener">
+    Read the whole Bible free <span class="arrow" aria-hidden="true">&rarr;</span>
+  </a>
+</footer>
+
+<div class="progress" aria-hidden="true"><i id="bar"></i></div>
+
+<div class="playbar" id="playbar">
+  <button id="bPrev" title="Previous verse (←)"><span class="icon">&#9664;</span></button>
+  <button id="bPlay" title="Pause (space)">Pause</button>
+  <button id="bNext" title="Next verse (→)"><span class="icon">&#9654;</span></button>
+  <span class="sep" aria-hidden="true"></span>
+  <button id="bWords" title="The Greek or Hebrew behind this verse (W)"><span class="dot"></span>Behind the words</button>
+  <button id="bMemory" title="Hide the verse and test yourself (M)">Memory</button>
+  <button id="bCat" title="A catechism question (C)">Catechism</button>
+  <button id="bGrow" title="Fruit of the Spirit and the armour of God (V)">Grow</button>
+  <button id="bPlay2" title="A quick game (G)">Play</button>
+  <button id="bPray" title="A candle, a challenge, a minute of prayer (P)">Pray</button>
+  <span class="sep" aria-hidden="true"></span>
+  <button id="bAmen" title="Amen (A)">Amen</button>
+  <button id="bFull" title="Fullscreen (F)"><span class="icon">&#9974;</span></button>
+</div>
+
+<section class="sheet" id="sheet" role="dialog" aria-modal="false" aria-labelledby="sheettitle">
+  <button class="x" id="sheetClose" title="Close (Esc)">&#10005;</button>
+  <div id="sheetBody"></div>
+</section>
+
+<div id="tip" aria-hidden="true"></div>
+<div id="toast" aria-hidden="true"></div>
+<div id="amen" aria-hidden="true"><span>Amen.</span></div>
+<div id="dove" aria-hidden="true">
+  <svg viewBox="0 0 120 92" role="img">
+    <path d="M6 58c10-13 26-20 42-19 4-11 14-20 27-24 8-2 15-2 22-1-4 5-6 10-6 15 0 3 1 6 3 9-3 6-5 11-5 15 0 3 1 6 3 8-2 6-3 11-3 16-9-1-19-6-25-13-16 3-33 1-46-7-5-3-9-7-12-11z"/>
+    <path d="M46 39c-8-2-16-8-21-16 9 3 18 6 27 6z" opacity=".75"/>
+  </svg>
+</div>
+
+<div id="hint">&nbsp;</div>
+
+<script id="data" type="application/json">__DATA__</script>
+<script>/*__YEAR__*/</script>
+<script>
+/* ------------------------------------------------------------------ *
+   Scripture screensaver for studytools.cc
+   Quiet by itself; when you touch it, the text opens up: the Greek or
+   Hebrew behind a word, the verse hidden for memory, a catechism
+   question, a game, a candle, a challenge a day.
+
+   Options (add to the URL, e.g. screensaver.html?only=nt&hold=30):
+     hold=<seconds>      how long each verse stays (default 24)
+     only=all|ot|nt      which part of the canon to draw from
+     shuffle=1           a different order each time
+     start=<n>|John 3:16  where to begin
+     theme=dark|light    light suits a bright desktop
+     bare=1              verse only: no clock, no taglines, no bar
+     quiet=1             keep it a wallpaper: no playing, no prompts
+     panel=words|memory|catechism|grow|play|pray   open that panel at start
+     round=finish|book|testament|translation|word   ask only that sort of question
+     still=1             no fading or drifting at all, for screenshots or a quiet panel
+     site=<url>          point every link somewhere else
+   Keys: ← → verse · space pause · 1..6 the six panels · V grow · G game ·
+         A amen · F fullscreen · H hide chrome · Esc close
+ * ------------------------------------------------------------------ */
+(function () {
+  "use strict";
+
+  var DATA = JSON.parse(document.getElementById("data").textContent);
+  var VERSES = DATA.verses, WORDS = DATA.words, MAP = DATA.map, REV = DATA.rev || {};
+
+  /* ---- options ---------------------------------------------------- */
+  var q = new URLSearchParams(location.search);
+  function num(v, d) { var n = parseFloat(v); return isFinite(n) && n > 0 ? n : d; }
+
+  var SITE  = (q.get("site") || DATA.site || "https://studytools.cc/").replace(/\/?$/, "/");
+  var HOLD  = num(q.get("hold"), 24) * 1000;
+  var ONLY  = (q.get("only") || "all").toLowerCase();
+  var BARE  = q.get("bare") === "1";
+  var QUIET = q.get("quiet") === "1";
+  var THEME = (q.get("theme") || "").toLowerCase();
+  var OPEN  = (q.get("panel") || "").toLowerCase();
+  var ROUND = (q.get("round") || "").toLowerCase();
+
+  if (THEME === "light" || THEME === "dark") document.documentElement.dataset.theme = THEME;
+  if (q.get("still") === "1") document.documentElement.classList.add("still");
+  document.documentElement.style.setProperty("--hold", (HOLD / 1000) + "s");
+
+  /* The pool is Scripture only — the Christian canon, Old and New Testament.
+     studytools.cc also carries the Apocrypha, and in Parallel Passages the
+     Qur'an, the Tanakh and the Book of Mormon for comparison; none of that is
+     quoted or offered here. */
+  var pool = VERSES.filter(function (v) {
+    if (ONLY === "ot") return v.testament === "OT";
+    if (ONLY === "nt") return v.testament === "NT";
+    return true;
+  });
+  if (!pool.length) pool = VERSES.slice();
+
+  var order = pool.map(function (_, i) { return i; });
+  if (q.get("shuffle") === "1") {
+    for (var i = order.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1)), t = order[i]; order[i] = order[j]; order[j] = t;
+    }
+  }
+  var at = 0, start = q.get("start");
+  if (start) {
+    var byRef = order.findIndex(function (k) { return pool[k].ref.toLowerCase() === start.toLowerCase(); });
+    var byNum = parseInt(start, 10);
+    if (byRef > -1) at = byRef;
+    else if (isFinite(byNum) && byNum >= 1 && byNum <= order.length) at = byNum - 1;
+  }
+
+  /* ---- what this screen remembers (this browser only) -------------- */
+  var KEY = "studytools.screensaver.v1";
+  var store = (function () {
+    var s = {};
+    try { s = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { s = {}; }
+    var base = { day: "", streak: 0, days: 0, seen: 0, verse: 0, memorized: [], lit: [],
+                 kept: [], learnt: [], best: 0, grown: {} };
+    Object.keys(base).forEach(function (k) { if (s[k] === undefined) s[k] = base[k]; });
+    return s;
+  })();
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) {} }
+  function today() { var d = new Date(); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); }
+  function dayNumber() {                       // day of the year, 0-based
+    var d = new Date();
+    return Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 86400000) - 1;
+  }
+  function touchDay() {                        // count today's visit, once
+    var t = today();
+    if (store.day !== t) {
+      var gap = store.day && (new Date(t) - new Date(store.day)) <= 172800000;
+      store.streak = gap ? store.streak + 1 : 1;
+      store.day = t; store.days += 1; save();
+    }
+  }
+
+  /* ---- elements --------------------------------------------------- */
+  var elVerse = document.getElementById("verse"), elText = document.getElementById("text");
+  var elRef = document.getElementById("ref"), elKB = document.getElementById("kb");
+  var elBar = document.getElementById("bar"), elTime = document.getElementById("time");
+  var elDate = document.getElementById("date"), elTag = document.getElementById("tagline");
+  var elStreak = document.getElementById("streak"), elHint = document.getElementById("hint");
+  var elBarPlay = document.getElementById("playbar"), elPlay = document.getElementById("bPlay");
+  var elSheet = document.getElementById("sheet"), elBody = document.getElementById("sheetBody");
+  var elTip = document.getElementById("tip"), elToast = document.getElementById("toast");
+  var elAmen = document.getElementById("amen"), elDove = document.getElementById("dove");
+  var elSeason = document.getElementById("season");
+
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]; }); }
+  function link(href, text, cls) { return '<a class="' + (cls || "") + '" href="' + esc(href) + '" target="_blank" rel="noopener">' + esc(text) + "</a>"; }
+  function el(html) { var d = document.createElement("div"); d.innerHTML = html.trim(); return d.firstElementChild; }
+
+  /* ---- the verse -------------------------------------------------- */
+  var timer = null, phase = null, paused = false, showing = null, current = null;
+
+  function readerURL(v) { return SITE + "apps/bible/?book=" + encodeURIComponent(v.slug) + "&chapter=" + v.chapter + "&verse=" + v.verses[0]; }
+  function strongURL(s) { return SITE + "apps/interlinear/?strong=" + encodeURIComponent(s); }
+  function studyURL(v) { return SITE + "apps/study/?ref=" + encodeURIComponent(v.ref.replace(/^Psalm\b/, "Psalms")); }
+
+  /* draw the verse as words, so each one can be tapped */
+  function paint(v, hideAll) {
+    current = v;
+    elText.innerHTML = "";
+    var wordMap = MAP[String(VERSES.indexOf(v))] || {};
+    var frag = document.createDocumentFragment();
+    v.text.split(/\s+/).forEach(function (tok, i) {
+      if (i) frag.appendChild(document.createTextNode(" "));
+      var m = /^([\u2018\u201c"']?)([A-Za-z][A-Za-z'\u2019-]*)([\s\S]*)$/.exec(tok);
+      var lead = m ? m[1] : "", core = m ? m[2] : tok, tail = m ? m[3] : "";
+      if (lead) frag.appendChild(document.createTextNode(lead));
+      var key = core.toLowerCase();
+      var hit = wordMap[key];
+      var span = document.createElement("span");
+      span.className = "w" + (hit ? " wk" : "") + (hideAll && core.length > 1 ? " hid" : "");
+      span.textContent = core;
+      if (hit) { span.dataset.w = key; span.dataset.i = hit[0]; }
+      if (hideAll && core.length > 1) span.dataset.hid = "1";
+      frag.appendChild(span);
+      if (tail) frag.appendChild(document.createTextNode(tail));
+    });
+    elText.appendChild(frag);
+    var learnt = store.memorized.indexOf(v.ref) > -1;
+    elRef.textContent = v.ref + (learnt ? " \u2713" : "");
+    elRef.href = readerURL(v);
+    elRef.title = "Open " + v.ref + " in the reader at studytools.cc";
+    document.title = v.ref + " — studytools.cc";
+  }
+
+  function restart(element) { element.style.animation = "none"; void element.offsetWidth; element.style.animation = ""; }
+
+  function show(i, animate) {
+    showing = order[(i % order.length + order.length) % order.length];
+    var v = pool[showing];
+    paint(v);
+    store.seen += 1; store.verse = showing; save();
+    refreshStreak();
+    if (animate === false) {
+      elVerse.classList.remove("in", "out");
+      requestAnimationFrame(function () { requestAnimationFrame(function () { elVerse.classList.add("in"); }); });
+    } else {
+      elVerse.classList.remove("in"); elVerse.classList.add("out");
+      setTimeout(function () { elVerse.classList.add("in"); }, 420);
+    }
+    restart(elKB); restart(elBar);
+  }
+
+  function schedule() {
+    clearTimeout(timer); clearTimeout(phase);
+    elVerse.classList.remove("out");
+    timer = setTimeout(function () {
+      phase = setTimeout(function () { at += 1; show(at); schedule(); }, 900);
+      elVerse.classList.add("out");
+    }, Math.max(2500, HOLD - 900));
+  }
+  function advance(step) {
+    clearTimeout(timer); clearTimeout(phase);
+    elVerse.classList.remove("out");
+    at += step; show(at);
+    if (!paused) schedule();
+  }
+  function setPaused(p) {
+    paused = p; elPlay.textContent = p ? "Play" : "Pause";
+    if (p) { clearTimeout(timer); clearTimeout(phase); motion(false); }
+    else { motion(true); schedule(); }
+  }
+
+  /* ---- the tooltip that shows the word behind the word ------------- */
+  function tipFor(span) {
+    var v = current, ws = WORDS[String(VERSES.indexOf(v))] || [], w = ws[parseInt(span.dataset.i, 10)];
+    if (!w) return "";
+    return '<b>' + esc(w.g) + "</b> " + esc(w.t) + " · " + esc(w.s) + " · " + esc(w.e || "—");
+  }
+  elText.addEventListener("mouseover", function (e) {
+    var span = e.target.closest(".wk"); if (!span || span.classList.contains("hid")) return;
+    elTip.innerHTML = tipFor(span); elTip.classList.add("show");
+    var r = span.getBoundingClientRect();
+    elTip.style.left = Math.min(Math.max(r.left + r.width / 2, 90), innerWidth - 90) + "px";
+    elTip.style.top = Math.max(r.top - 4, 44) + "px";
+  });
+  elText.addEventListener("mouseout", function (e) { if (e.target.closest(".wk")) elTip.classList.remove("show"); });
+  addEventListener("scroll", function () { elTip.classList.remove("show"); });
+
+  elText.addEventListener("click", function (e) {
+    var span = e.target.closest(".w"); if (!span) return;
+    e.stopPropagation();
+    if (span.classList.contains("hid")) { span.classList.remove("hid"); spark(span); return; }
+    openPanel("words", { index: span.dataset.i ? parseInt(span.dataset.i, 10) : -1 });
+  });
+
+  /* ---- the panels -------------------------------------------------- */
+  var panel = null;
+  function closePanel() {
+    panel = null; elSheet.classList.remove("show"); document.body.classList.remove("panel");
+    elTip.classList.remove("show");
+    document.querySelectorAll(".playbar button[data-tab]").forEach(function (b) { b.setAttribute("aria-pressed", "false"); });
+    if (!paused) schedule();
+  }
+  function openPanel(name, arg) {
+    if (panel === name && !arg) { closePanel(); return; }
+    panel = name;
+    clearTimeout(timer); clearTimeout(phase);
+    elSheet.classList.add("show"); document.body.classList.add("panel");
+    document.querySelectorAll(".playbar button[data-tab]").forEach(function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.tab === name));
+    });
+    PANELS[name](arg || {});
+  }
+  document.getElementById("sheetClose").onclick = closePanel;
+
+  function head(title, sub) {
+    return '<h2 id="sheettitle"><span class="n">' + esc(sub) + "</span>" + esc(title) + "</h2>";
+  }
+
+  var PANELS = {};
+
+  /* --- behind the words -------------------------------------------- */
+  PANELS.words = function (arg) {
+    var v = current, vi = VERSES.indexOf(v), ws = WORDS[String(vi)] || [], rev = REV[String(vi)] || {};
+    var sel = arg.index;
+    if (sel === undefined || sel < 0) {                     // open on the first word with an original behind it
+      sel = -1;
+      for (var k = 0; k < ws.length; k++) { if (rev[k]) { sel = k; break; } }
+    }
+    var lang = v.testament === "OT" ? "Hebrew" : "Greek";
+    var src = v.testament === "OT"
+      ? "Open Scriptures Hebrew Bible, with STEPBible glosses"
+      : "OpenGNT, with its glosses";
+    var html = head("Behind the words", v.ref) +
+      '<p class="sub">' + lang + " behind the English · World English Bible (Updated)</p>" +
+      '<div class="orig">' + ws.map(function (w, i) {
+        return '<button class="chip' + (i === sel ? " on" : "") + '" data-i="' + i + '">' +
+          (rev[i] ? '<span class="en">' + esc(rev[i]) + "</span>" : "") +
+          '<span class="g">' + esc(w.g) + '</span><span class="t">' + esc(w.t) + "</span>" +
+          '<span class="e">' + esc(w.e || "—") + "</span></button>";
+      }).join("") + "</div>" +
+      '<div class="detail" id="wd"></div>' +
+      '<p class="note">' + esc(lang) + ": " + esc(src) + ". The same files are the site's interlinear — " +
+      link(SITE + "apps/interlinear/", "read it word by word, with the concordance, at studytools.cc") + ".</p>";
+    elBody.innerHTML = html;
+
+    function detail(i) {
+      var w = ws[i];
+      if (!w) { document.getElementById("wd").innerHTML = '<p class="note" style="margin:0">Tap a word above to see the original behind it.</p>'; return; }
+      document.getElementById("wd").innerHTML =
+        '<div class="row"><div class="grow"><div class="big">' + esc(w.g) + "</div>" +
+        '<div class="tr">' + esc(w.t) + (w.l && w.l !== w.g ? " · " + esc(w.l) : "") + "</div></div>" +
+        "<div style='text-align:right'><div class='tr'>" + esc(w.s) + "</div>" +
+        '<div style="font-size:.72rem;color:var(--ink-faint)">' + esc(w.m || "") + "</div></div></div>" +
+        '<div class="gl"><b>' + esc(w.e || "—") + "</b></div>" +
+        '<p class="meta">' + link(strongURL(w.s), "Every verse with this word") +
+        " · concordance, morphology and interlinear at studytools.cc</p>";
+      document.querySelectorAll(".chip").forEach(function (c) { c.classList.toggle("on", parseInt(c.dataset.i, 10) === i); });
+    }
+    elBody.querySelectorAll(".chip").forEach(function (c) {
+      c.onclick = function () {
+        detail(parseInt(c.dataset.i, 10));
+        var d = document.getElementById("wd");
+        if (d) { var r = d.getBoundingClientRect(); if (r.bottom > innerHeight) d.scrollIntoView({ block: "nearest" }); }
+      };
+    });
+    detail(sel);
+  };
+
+  /* --- memory ------------------------------------------------------- */
+  PANELS.memory = function () {
+    var v = current;
+    var known = store.memorized.indexOf(v.ref) > -1;
+    elBody.innerHTML = head("Hide the verse", v.ref) +
+      '<p class="sub">' + (known ? "Learnt ✓ · " : "") + "Tap a blank to check yourself</p>" +
+      '<p class="qtext" id="memtext"></p>' +
+      '<div class="row"><button class="btn gold" id="mPeek">Reveal all</button>' +
+      '<button class="btn" id="mHide">Hide again</button>' +
+      '<button class="btn" id="mGot">I have it ✓</button>' +
+      '<button class="btn" id="mNot">Not yet</button></div>' +
+      '<p class="note">Learning it by heart is the old way of holding a text. The site keeps a spaced-repetition ' +
+      "memory app for the verses you are learning — " + link(SITE + "apps/memory/", "Scripture Memory at studytools.cc") + ".</p>";
+    var draw = function (hide) {
+      var words = v.text.split(/\s+/);
+      document.getElementById("memtext").innerHTML = words.map(function (t) {
+        var m = /^([\u2018\u201c"']?)([A-Za-z][A-Za-z'\u2019-]*)([\s\S]*)$/.exec(t);
+        if (!m || m[2].length < 2) return esc(t);
+        return esc(m[1]) + '<span class="w hid">' + esc(m[2]) + "</span>" + esc(m[3]);
+      }).join(" ");
+      if (!hide) document.querySelectorAll("#memtext .hid").forEach(function (s) { s.classList.remove("hid"); });
+    };
+    draw(true);
+    document.getElementById("memtext").onclick = function (e) {
+      var s = e.target.closest(".hid"); if (!s) return;
+      s.classList.remove("hid"); spark(s);
+      if (!document.querySelectorAll("#memtext .hid").length) toast("<b>You had it.</b> Hidden in your heart.");
+    };
+    document.getElementById("mPeek").onclick = function () { draw(false); };
+    document.getElementById("mHide").onclick = function () { draw(true); };
+    document.getElementById("mGot").onclick = function () {
+      if (store.memorized.indexOf(v.ref) < 0) store.memorized.push(v.ref);
+      save(); amen();
+      elRef.textContent = v.ref + " \u2713";
+      toast("<b>" + esc(v.ref) + "</b> marked as learnt"); PANELS.memory();
+    };
+    document.getElementById("mNot").onclick = function () { toast("Read it once more, then hide it again."); };
+  };
+
+  /* --- catechism ---------------------------------------------------- */
+  var catKey = "westminster", catIndex = null;
+  PANELS.catechism = function (arg) {
+    var book = DATA.catechism[catKey], n = book.items.length;
+    if (catIndex === null) catIndex = dayNumber() % n;
+    if (arg.today) catIndex = dayNumber() % n;
+    if (arg.next) catIndex = (catIndex + 1) % n;
+    if (arg.prev) catIndex = (catIndex - 1 + n) % n;
+    var it = book.items[catIndex];
+    var learnt = store.learnt.indexOf(catKey + ":" + it.n) > -1;
+    elBody.innerHTML = head(book.title, "Question " + it.n + " of " + n) +
+      '<div class="tabs">' +
+      '<button class="btn' + (catKey === "westminster" ? " on" : "") + '" data-k="westminster">Westminster Shorter</button>' +
+      '<button class="btn' + (catKey === "heidelberg" ? " on" : "") + '" data-k="heidelberg">Heidelberg</button>' +
+      "</div>" +
+      '<p class="cat-q" id="cq">' + esc(it.q) + "</p>" +
+      '<p class="cat-a hidden" id="ca">' + esc(it.a) + "</p>" +
+      '<p class="cat-hidden" id="ch">Tap to reveal the answer.</p>' +
+      '<div class="row" style="margin-top:16px">' +
+      '<button class="btn gold" id="cRev">Reveal answer</button>' +
+      '<button class="btn" id="cNext">Another</button>' +
+      '<button class="btn" id="cToday">Today\u2019s</button>' +
+      '<button class="btn' + (learnt ? " on" : "") + '" id="cLearn">' + (learnt ? "Learnt ✓" : "Learnt") + "</button>" +
+      "</div>" +
+      '<p class="note">' + esc(book.title) + " — public domain. The site also carries the creeds and the church's " +
+      "calendar: " + link(SITE + "apps/calendar/", "Calendar & Catechisms at studytools.cc") + ".</p>";
+    var reveal = function () {
+      document.getElementById("ca").classList.remove("hidden");
+      document.getElementById("ch").style.display = "none";
+    };
+    document.getElementById("cRev").onclick = reveal;
+    document.getElementById("cq").onclick = reveal;
+    document.getElementById("cNext").onclick = function () { PANELS.catechism({ next: true }); };
+    document.getElementById("cToday").onclick = function () { PANELS.catechism({ today: true }); };
+    document.getElementById("cLearn").onclick = function () {
+      var k = catKey + ":" + it.n, i = store.learnt.indexOf(k);
+      if (i < 0) { store.learnt.push(k); amen(); } else store.learnt.splice(i, 1);
+      save(); PANELS.catechism();
+    };
+    elBody.querySelectorAll("[data-k]").forEach(function (b) {
+      b.onclick = function () { catKey = b.dataset.k; PANELS.catechism(); };
+    });
+    document.querySelector(".sheet").scrollTop = 0;
+  };
+
+  /* --- games -------------------------------------------------------- */
+  var game = null;
+  function newGame() { game = { n: 0, right: 0, asked: null, done: false }; }
+  newGame();
+
+  function makeQuestion() {
+    var rnd = function (n) { return Math.floor(Math.random() * n); };
+    var KINDS = ["finish", "book", "testament", "translation", "word"];
+    var kind = KINDS.indexOf(ROUND) > -1 ? ROUND : KINDS[rnd(KINDS.length)];
+
+    if (kind === "word") {                 // one word of the original, from the site's vocabulary
+      var vocab = DATA.vocab || [];
+      if (vocab.length > 3) {
+        var w = vocab[rnd(vocab.length)], opts0 = [w.g];
+        for (var vTry = 0; vTry < 40 && opts0.length < 3; vTry++) {   // bounded: never spin
+          var o2 = vocab[(rnd(vocab.length) + vTry) % vocab.length].g;
+          if (opts0.indexOf(o2) < 0) opts0.push(o2);
+        }
+        opts0.sort(function () { return Math.random() - 0.5; });
+        return { q: '<span style="font-family:var(--serif);font-size:1.5em">' + esc(w.l) + "</span> " +
+                 esc(w.t) + ' <span class="score">' + esc(w.s) + " \u00b7 " +
+                 (w.k === "g" ? "Greek" : "Hebrew") + '</span><br>What does it mean?',
+                 opts: opts0, right: opts0.indexOf(w.g), a: null, why: "One word of the original" };
+      }
+      kind = "finish";
+    }
+
+    if (kind === "translation") {          // which of these translations is this?
+      var keys = Object.keys(DATA.alt || {}).filter(function (k2) {
+        var a2 = DATA.alt[k2];
+        return a2 && a2.KJV && a2.YLT;
+      });
+      if (keys.length > 3) {
+        var k3 = keys[rnd(keys.length)], vi = parseInt(k3, 10), vv = VERSES[vi];
+        var which = rnd(3);
+        var names = ["World English Bible (Updated)", "King James Version", "Young\u2019s Literal Translation"];
+        var body = which === 0 ? vv.text : DATA.alt[k3][which === 1 ? "KJV" : "YLT"];
+        return { q: "\u201c" + esc(body) + "\u201d", opts: names, right: which, a: vv,
+                 why: "Which translation is this?" };
+      }
+      kind = "book";
+    }
+
+    var v = pool[rnd(pool.length)];
+    var words = v.text.split(/\s+/);
+    if (kind === "finish" && words.length > 6) {
+      var cut = Math.max(4, Math.round(words.length * 0.55));
+      var head2 = words.slice(0, cut).join(" ");
+      var right = words.slice(cut).join(" ");
+      var others = [];
+      for (var fTry = 0; fTry < 60 && others.length < 2; fTry++) {    // bounded: never spin
+        var o = pool[(rnd(pool.length) + fTry * 7) % pool.length];
+        if (o.ref === v.ref || v.text.indexOf(o.text.split(/\s+/).slice(-3)[0]) > -1) continue;
+        var ow = o.text.split(/\s+/);
+        others.push(ow.slice(Math.max(2, Math.round(ow.length * 0.5))).join(" "));
+      }
+      if (!others.length) return makeQuestion();
+      var opts = [right].concat(others).sort(function () { return Math.random() - 0.5; });
+      return { q: head2 + ' <span class="blank">…</span>', opts: opts, right: opts.indexOf(right),
+               a: v, why: "Finish the verse" };
+    }
+    if (kind === "book") {
+      var books = [];
+      pool.forEach(function (p) { var b = p.ref.replace(/\s+\d+:.*$/, ""); if (books.indexOf(b) < 0) books.push(b); });
+      var b0 = v.ref.replace(/\s+\d+:.*$/, "");
+      var opts2 = [b0];
+      for (var bTry = 0; bTry < 60 && opts2.length < 4; bTry++) {     // bounded: never spin
+        var b2 = books[(rnd(books.length) + bTry) % books.length];
+        if (opts2.indexOf(b2) < 0) opts2.push(b2);
+      }
+      opts2.sort(function () { return Math.random() - 0.5; });
+      return { q: "\u201c" + v.text + "\u201d", opts: opts2, right: opts2.indexOf(b0),
+               a: v, why: "Which book is this from?" };
+    }
+    var isOT = v.testament === "OT";
+    return { q: "\u201c" + v.text + "\u201d", opts: ["Old Testament", "New Testament"],
+             right: isOT ? 0 : 1, a: v, why: "Old Testament or New?" };
+  }
+
+  PANELS.play = function () {
+    if (!game || game.done) { newGame(); }
+    if (!game.asked) game.asked = makeQuestion();
+    var g = game.asked;
+    elBody.innerHTML = head("A quick game", "Round " + (game.n + 1) + " of 5") +
+      '<div class="row" style="justify-content:space-between"><span class="score">Right so far <b>' + game.right +
+      "</b> · Your best " + store.best + "/5</span></div>" +
+      '<p class="qtext">' + (g.why ? '<span class="score">' + g.why + "</span><br>" : "") + g.q + "</p>" +
+      '<div class="opts" id="opts">' + g.opts.map(function (o, i) {
+        return '<button class="opt" data-i="' + i + '">' + esc(o) + "</button>";
+      }).join("") + "</div>" +
+      '<div class="row" style="margin-top:16px"><button class="btn" id="gSkip">Skip</button>' +
+      '<span class="grow"></span><button class="btn gold" id="gNext" style="display:none">Next →</button></div>' +
+      '<p class="note">' + (g.a
+        ? "The verses are all from studytools.cc — " + link(studyURL(g.a), "study " + esc(g.a.ref) +
+          " there") + ", with the commentary, cross-references and the original text."
+        : "Every word here, with its concordance, is at " + link(SITE + "apps/vocab/",
+          "the site\u2019s Greek and Hebrew vocabulary") + ", and at " +
+          link(SITE + "apps/interlinear/", "the interlinear") + " word by word.") + "</p>";
+
+    var answered = false;
+    elBody.querySelectorAll(".opt").forEach(function (b) {
+      b.onclick = function () {
+        if (answered) return; answered = true;
+        var i = parseInt(b.dataset.i, 10), ok = i === g.right;
+        elBody.querySelectorAll(".opt").forEach(function (o) {
+          o.classList.add("done");
+          if (parseInt(o.dataset.i, 10) === g.right) o.classList.add("right");
+        });
+        if (!ok) b.classList.add("wrong"); else { game.right += 1; spark(b); }
+        game.n += 1;
+        if (game.n >= 5) {
+          game.done = true;
+          if (game.right > store.best) store.best = game.right;
+          save();
+          if (game.right === 5) { dove(); amen(); burst(); toast("<b>Five for five.</b> Well done, good and faithful servant."); }
+          else toast("<b>" + game.right + " of 5.</b> " + g.a.ref + " — " + esc(g.a.text.split(",")[0]));
+        } else {
+          toast(ok ? "<b>Right.</b> " + esc(g.a.ref) : "<b>" + esc(g.a.ref) + "</b> was the one.");
+        }
+        document.getElementById("gNext").style.display = game.done ? "none" : "";
+        document.getElementById("gNext").textContent = "Next →";
+        if (game.done) {
+          var again = document.getElementById("gSkip");
+          again.textContent = "Play again";
+          again.onclick = function () { newGame(); PANELS.play(); };
+        }
+      };
+    });
+    document.getElementById("gNext").onclick = function () { game.asked = null; PANELS.play(); };
+    document.getElementById("gSkip").onclick = function () { game.asked = null; PANELS.play(); };
+  };
+
+  /* --- grow: the fruit of the Spirit and the armour of God ---------- */
+  var growTab = "fruit";
+  PANELS.grow = function (arg) {
+    var sets = DATA.grow || { fruit: [], armor: [] };
+    var set = sets[growTab] || [];
+    var t = today();
+    if (!store.grown[t]) store.grown[t] = [];
+    var done = store.grown[t];
+    var sel = arg && arg.sel !== undefined ? arg.sel : -1;
+
+    elBody.innerHTML = head("What to grow in",
+        growTab === "fruit" ? "The fruit of the Spirit \u00b7 Galatians 5:22" : "The armour of God \u00b7 Ephesians 6") +
+      '<div class="tabs">' +
+      '<button class="btn' + (growTab === "fruit" ? " on" : "") + '" data-t="fruit">Fruit of the Spirit</button>' +
+      '<button class="btn' + (growTab === "armor" ? " on" : "") + '" data-t="armor">The armour of God</button>' +
+      "</div>" +
+      '<p class="progressline"><b>' + done.length + "</b> of " + set.length +
+      " taken up today \u2014 tap one to begin it, and do it before you sleep.</p>" +
+      '<div class="growgrid" id="gg">' + set.map(function (it, i) {
+        return '<button class="chip' + (done.indexOf(it.n) > -1 ? " on" : "") + '" data-i="' + i + '">' +
+          '<span class="gchip-n">' + esc(it.n) + '</span><span class="g">' + esc(it.ref) + "</span></button>";
+      }).join("") + "</div>" +
+      '<div class="detail" id="gd" style="margin-top:14px"></div>' +
+      '<p class="note">' + (growTab === "fruit"
+        ? "Nine things the Spirit grows in a life, and one place to start each. "
+        : "Six pieces of a soldier\u2019s kit, and what each is for. ") +
+      "The verses are public domain; the topical Bible and the commentary on them are at " +
+      link(SITE + "apps/topical/", "studytools.cc") + ".</p>";
+
+    function card(i) {
+      var it = set[i];
+      if (!it) { document.getElementById("gd").innerHTML =
+        '<p class="note" style="margin:0">Tap one above \u2014 the verse and one place to begin will open here.</p>'; return; }
+      document.getElementById("gd").innerHTML =
+        '<div class="row" style="justify-content:space-between;align-items:baseline">' +
+        '<div class="big" style="font-family:var(--serif);font-size:1.15rem">' + esc(it.n) + "</div>" +
+        '<a class="verse-ref" style="border:0" href="' + SITE + "apps/study/?ref=" +
+        encodeURIComponent(it.ref) + '" target="_blank" rel="noopener">' + esc(it.ref) + " \u2192</a></div>" +
+        '<p style="font-family:var(--serif);font-size:1rem;line-height:1.5;margin:10px 0 8px">\u201c' +
+        esc(it.text) + "\u201d</p>" +
+        '<p class="meta">' + esc(it.line) + "</p>";
+    }
+
+    elBody.querySelectorAll("[data-t]").forEach(function (b) {
+      b.onclick = function () { growTab = b.dataset.t; PANELS.grow(); };
+    });
+    elBody.querySelectorAll("#gg .chip").forEach(function (c) {
+      c.onclick = function () {
+        var i = parseInt(c.dataset.i, 10), it = set[i];
+        if (done.indexOf(it.n) < 0) {
+          done.push(it.n); save();
+          c.classList.add("on");
+          spark(c);
+          var left = set.length - done.length;
+          if (!left) { dove(); amen(); burst(); toast("<b>All " + set.length + "</b> taken up today. Well done."); }
+          else toast("<b>" + esc(it.n) + "</b> \u00b7 " + left + " to go today");
+        }
+        elBody.querySelectorAll("#gg .chip, .progressline").forEach(function () {});
+        elBody.querySelector(".progressline").innerHTML = "<b>" + done.length + "</b> of " + set.length +
+          " taken up today \u2014 tap one to begin it, and do it before you sleep.";
+        card(i);
+      };
+    });
+    card(sel);
+  };
+
+  /* --- pray --------------------------------------------------------- */
+  var FOCUS = ["Family", "Community", "Global Missions", "the Church", "the Nation",
+               "the Sick and Suffering", "those who do not yet believe"];
+  var ringTimer = null;
+  PANELS.pray = function () {
+    var t = today();
+    var lit = store.lit.indexOf(t) > -1;
+    var ch = DATA.challenges[dayNumber() % DATA.challenges.length];
+    var kept = store.kept.indexOf(t) > -1;
+    var focus = FOCUS[dayNumber() % FOCUS.length];
+    elBody.innerHTML = head("A minute with God", "Today") +
+      '<div class="candle' + (lit ? " lit" : "") + '" id="cnd">' +
+      '<svg viewBox="0 0 60 92" aria-hidden="true" style="width:44px;height:72px">' +
+      '<ellipse class="flame" cx="30" cy="18" rx="7" ry="13" fill="var(--gold)" opacity="' + (lit ? ".95" : ".18") + '"/>' +
+      '<rect x="20" y="34" width="20" height="52" rx="4" fill="var(--ink-faint)" opacity=".5"/>' +
+      '<rect x="14" y="84" width="32" height="6" rx="3" fill="var(--gold-soft)"/>' +
+      "</svg>" +
+      '<div class="grow"><div style="font-size:.74rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint)">Tonight</div>' +
+      '<p style="margin:4px 0 10px;font-family:var(--serif);font-size:1.15rem">' +
+      (lit ? "Candle lit. " + store.lit.length + " nights lit." : "Light a candle for today.") + "</p>" +
+      '<button class="btn gold" id="pLit">' + (lit ? "Blown out" : "Light the candle") + "</button></div>" +
+      '<div style="text-align:center"><svg class="ring" viewBox="0 0 36 36"><circle class="bg" cx="18" cy="18" r="15"/>' +
+      '<circle class="fg" id="ringfg" cx="18" cy="18" r="15" stroke-dasharray="94.2" stroke-dashoffset="94.2" ' +
+      'transform="rotate(-90 18 18)"/></svg><div id="rtxt" style="font-size:.68rem;color:var(--ink-faint);margin-top:6px">60s</div></div></div>' +
+
+      '<div class="detail">' +
+      '<div style="font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)">Today\u2019s challenge</div>' +
+      '<p style="margin:8px 0 4px;font-family:var(--serif);font-size:1.2rem">' + esc(ch[0]) + "</p>" +
+      '<p style="margin:0;color:var(--ink-soft);font-size:.9rem">' + esc(ch[1]) + "</p>" +
+      '<div class="row" style="margin-top:12px"><button class="btn' + (kept ? " on" : "") + '" id="pKeep">' +
+      (kept ? "Kept ✓" : "I did it") + "</button>" +
+      '<button class="btn" id="pOther">Another challenge</button></div></div>' +
+
+      '<div class="row" style="margin-top:16px;gap:12px"><div class="grow"><div style="font-size:.7rem;letter-spacing:.14em;' +
+      'text-transform:uppercase;color:var(--gold)">Pray now for ' + esc(focus) + "</div>" +
+      '<p style="margin:6px 0 0;color:var(--ink-soft);font-size:.88rem">Say it plainly, in your own words. ' +
+      "A minute is enough to start.</p></div>" +
+      '<button class="btn gold" id="pStart">Pray 1 min</button></div>' +
+
+      '<div class="detail" style="margin-bottom:14px">' +
+      '<div style="font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)">In the church\u2019s year</div>' +
+      '<p style="margin:8px 0 2px;font-family:var(--serif);font-size:1.15rem">' + esc(dayName(new Date())) + "</p>" +
+      '<p class="note" style="margin-top:2px">Psalms, lessons and the season as the Prayer Book (1928) keeps them — ' +
+      link(SITE + "apps/calendar/", "today at studytools.cc") + ".</p></div>" +
+      '<div class="stats">' +
+      "<div><b>" + store.days + "</b><span>days here</span></div>" +
+      "<div><b>" + store.streak + "</b><span>day streak</span></div>" +
+      "<div><b>" + store.seen + "</b><span>verses read</span></div>" +
+      "<div><b>" + store.memorized.length + "</b><span>hidden in heart</span></div>" +
+      "<div><b>" + store.learnt.length + "</b><span>catechism learnt</span></div>" +
+      "</div>" +
+      '<p class="note">The site keeps the rest of it: a prayer journal and focus timer, a reading plan, notes, ' +
+      "highlights and memory verses — " + link(SITE + "apps/prayer/", "Prayer & Journal at studytools.cc") + ".</p>";
+
+    document.getElementById("pLit").onclick = function () {
+      var i = store.lit.indexOf(t);
+      if (i < 0) { store.lit.push(t); amen(); toast("Candle lit. <b>" + store.lit.length + "</b> nights lit."); }
+      else store.lit.splice(i, 1);
+      save(); PANELS.pray();
+    };
+    document.getElementById("pKeep").onclick = function () {
+      var i = store.kept.indexOf(t);
+      if (i < 0) { store.kept.push(t); spark(document.getElementById("pKeep")); toast("<b>Kept.</b> " + esc(ch[0]) + "."); }
+      else store.kept.splice(i, 1);
+      save(); PANELS.pray();
+    };
+    document.getElementById("pOther").onclick = function () {
+      DATA.challenges.push(DATA.challenges.shift()); PANELS.pray();
+    };
+    document.getElementById("pStart").onclick = function () {
+      if (ringTimer) { clearInterval(ringTimer); ringTimer = null; document.getElementById("rtxt").textContent = "60s";
+        document.getElementById("ringfg").setAttribute("stroke-dashoffset", 94.2); document.getElementById("pStart").textContent = "Pray 1 min"; return; }
+      var left = 60, fg = document.getElementById("ringfg"), txt = document.getElementById("rtxt"), b = document.getElementById("pStart");
+      b.textContent = "Stop";
+      ringTimer = setInterval(function () {
+        left -= 1;
+        fg.setAttribute("stroke-dashoffset", String(94.2 * left / 60));
+        txt.textContent = left + "s";
+        if (left <= 0) {
+          clearInterval(ringTimer); ringTimer = null; b.textContent = "Pray 1 min";
+          txt.textContent = "60s"; fg.setAttribute("stroke-dashoffset", 94.2);
+          amen(); burst(); toast("<b>Amen.</b> Start again whenever you like.");
+        }
+      }, 1000);
+    };
+  };
+
+  /* ---- little pleasures: sparkles, Amen, burst --------------------- */
+  function spark(at) {
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    var r = at.getBoundingClientRect ? at.getBoundingClientRect() : { left: innerWidth / 2, top: innerHeight / 2, width: 0, height: 0 };
+    for (var i = 0; i < 7; i++) {
+      var s = document.createElement("i");
+      s.className = "spark";
+      var a = Math.random() * Math.PI * 2, d = 22 + Math.random() * 40;
+      s.style.left = (r.left + r.width / 2 + (Math.random() - .5) * 20) + "px";
+      s.style.top = (r.top + r.height / 2 + (Math.random() - .5) * 20) + "px";
+      s.style.setProperty("--dx", Math.cos(a) * d + "px");
+      s.style.setProperty("--dy", Math.sin(a) * d + "px");
+      s.style.background = Math.random() < .3 ? "var(--gold-soft)" : "var(--gold)";
+      document.body.appendChild(s);
+      setTimeout(function (n) { return function () { n.remove(); }; }(s), 950);
+    }
+  }
+  function burst() {
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    var box = { getBoundingClientRect: function () { return { left: 0, top: innerHeight * .35, width: innerWidth, height: 0 }; } };
+    for (var i = 0; i < 3; i++) setTimeout(function () { spark(box); }, i * 260);
+  }
+  function amen() {
+    elAmen.classList.remove("show"); void elAmen.offsetWidth; elAmen.classList.add("show");
+  }
+  function dove() {                     // for a thing done well
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    elDove.classList.remove("fly"); void elDove.offsetWidth; elDove.classList.add("fly");
+  }
+  var toastT = null;
+  function toast(html) {
+    if (elSheet.classList.contains("show")) {                 // keep clear of the open panel
+      var top = elSheet.getBoundingClientRect().top;
+      elToast.style.top = Math.max(62, top - 54) + "px";
+      elToast.style.bottom = "auto";
+    } else {
+      elToast.style.top = ""; elToast.style.bottom = "";
+    }
+    elToast.innerHTML = html; elToast.classList.add("show");
+    clearTimeout(toastT); toastT = setTimeout(function () { elToast.classList.remove("show"); }, 4200);
+  }
+
+  /* ---- the church's year ------------------------------------------- */
+  var YEAR = (typeof ScriptureYear !== "undefined") ? ScriptureYear : null;
+  var FEASTS = DATA.feasts || { fixed: {}, movable: [] };
+
+  function feastOn(d) {
+    if (!YEAR) return null;
+    var y = d.getFullYear();
+    for (var i = 0; i < FEASTS.movable.length; i++) {
+      var f = FEASTS.movable[i];
+      if (YEAR.addDays(YEAR.easter(y), f.o).toDateString() === d.toDateString()) return f.n;
+    }
+    var k = String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    return FEASTS.fixed[k] || null;
+  }
+
+  function dayName(d) { return feastOn(d) || (YEAR ? YEAR.title(YEAR.weekName(d)) : ""); }
+
+  function seasonLine() {
+    if (!YEAR || BARE) return;
+    var d = new Date(), name = dayName(d);
+    elSeason.innerHTML = name
+      ? '<a href="' + SITE + 'apps/calendar/" target="_blank" rel="noopener" ' +
+        'title="Today\u2019s psalms, lessons and the church\u2019s year at studytools.cc">' +
+        esc(name) + "</a>"
+      : "";
+  }
+
+  /* ---- clock, taglines, streak line -------------------------------- */
+  var DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  var MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  function tick() {
+    var d = new Date(), h = d.getHours(), m = d.getMinutes();
+    elTime.textContent = (h % 12 || 12) + ":" + String(m).padStart(2, "0") + " " + (h >= 12 ? "PM" : "AM");
+    elDate.textContent = DAYS[d.getDay()] + ", " + MONTHS[d.getMonth()] + " " + d.getDate();
+  }
+  function refreshStreak() {
+    touchDay();
+    function verses(n) { return n + (n === 1 ? " verse read here" : " verses read here"); }
+    elStreak.innerHTML = store.streak > 1
+      ? "Day <b>" + store.streak + "</b> · " + verses(store.seen)
+      : (store.seen ? verses(store.seen) : "");
+  }
+  tick(); refreshStreak(); seasonLine();
+  setInterval(function () { tick(); seasonLine(); }, 15000);
+
+  var TAGS = [
+    "Every verse on your screen is free to read — and to study — at <b>studytools.cc</b>.",
+    "<b>studytools.cc</b>: the whole Bible in seven translations, and <em>23 study tools</em> around it.",
+    "No account, no ads, no tracking. Just Scripture, at <b>studytools.cc</b>.",
+    "Tap any word for the Greek or Hebrew behind it — then read it all at <b>studytools.cc</b>.",
+    "Commentary, cross-references, topical Bible, concordance — free at <b>studytools.cc</b>.",
+    "Open the chapter, write a note, keep a reading plan. <b>studytools.cc</b>",
+    "Greek and Hebrew word by word, and 344,000 cross-references, at <b>studytools.cc</b>.",
+    "Make it a habit: a chapter a day at <b>studytools.cc</b>.",
+    "Your notes, highlights and memory verses stay in your own browser — <b>studytools.cc</b>.",
+    "Search all seven translations at once at <b>studytools.cc</b>."
+  ];
+  var ti = Math.floor(Math.random() * TAGS.length);
+  function tag() {
+    elTag.style.opacity = "0";
+    setTimeout(function () { elTag.innerHTML = TAGS[ti++ % TAGS.length]; elTag.style.opacity = "1"; }, 800);
+  }
+  tag(); setInterval(tag, 11000);
+
+  /* ---- fullscreen, hints, idle ------------------------------------- */
+  function isFull() { return !!document.fullscreenElement || !!document.webkitFullscreenElement; }
+  function toggleFull() {
+    try {
+      if (isFull()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      else { var e = document.documentElement; (e.requestFullscreen || e.webkitRequestFullscreen).call(e); }
+    } catch (err) { /* the browser said no */ }
+  }
+  function hint() {
+    elHint.innerHTML = paused
+      ? "Paused — space to resume"
+      : QUIET ? ""
+      : "Tap any word for the original — or 1 words · 2 memory · 3 catechism · 4 grow · 5 game · 6 pray" +
+        (isFull() ? "" : " · click for fullscreen");
+    elHint.classList.remove("gone");
+    clearTimeout(hint._t);
+    hint._t = setTimeout(function () { elHint.classList.add("gone"); }, 8000);
+  }
+
+  var idle = null;
+  function wake() {
+    document.body.classList.remove("idle");
+    elBarPlay.classList.add("show");
+    clearTimeout(idle);
+    idle = setTimeout(function () {
+      if (!elBarPlay.matches(":hover") && !elSheet.matches(":hover")) {
+        elBarPlay.classList.remove("show"); elTip.classList.remove("show");
+        if (!elSheet.classList.contains("show")) document.body.classList.add("idle");
+      }
+    }, 3400);
+  }
+  addEventListener("mousemove", wake, { passive: true });
+  addEventListener("mousedown", wake, { passive: true });
+  addEventListener("touchstart", wake, { passive: true });
+
+  addEventListener("click", function (e) {
+    if (e.target.closest("a,button,.sheet,.playbar")) return;
+    if (elSheet.classList.contains("show")) { closePanel(); return; }
+    if (QUIET) { if (!isFull()) toggleFull(); return; }
+    spark(e.target === document.body || e.target.closest(".stage,.glow,.vignette,#dust") ? { getBoundingClientRect: function () { return { left: e.clientX - 4, top: e.clientY - 4, width: 8, height: 8 }; } } : e.target);
+    if (!isFull()) toggleFull();
+  });
+
+  addEventListener("keydown", function (e) {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    var k = e.key, map = { w: "words", m: "memory", c: "catechism", v: "grow", g: "play", p: "pray" };
+    var numbered = ["words", "memory", "catechism", "grow", "play", "pray"];
+    if (k === "ArrowRight" || k === "PageDown") { advance(1); hint(); }
+    else if (k === "ArrowLeft" || k === "PageUp") { advance(-1); hint(); }
+    else if (k === " ") {
+      if (e.target.closest("button,a")) return;
+      setPaused(!paused); hint(); e.preventDefault();
+    }
+    else if (k === "f" || k === "F") { toggleFull(); hint(); }
+    else if (k === "a" || k === "A") { amen(); burst(); }
+    else if (k === "Escape") { closePanel(); }
+    else if (k === "h" || k === "H") {
+      document.querySelectorAll(".hud,.progress,.playbar,#hint").forEach(function (n) { n.style.display = n.style.display === "none" ? "" : "none"; });
+    }
+    else if (k >= "1" && k <= "6" && !QUIET) { openPanel(numbered[parseInt(k, 10) - 1]); }
+    else if (map[k.toLowerCase()] && !QUIET) { openPanel(map[k.toLowerCase()]); }
+    else return;
+    wake();
+  });
+
+  elPlay.onclick = function () { setPaused(!paused); hint(); };
+  document.getElementById("bNext").onclick = function () { advance(1); };
+  document.getElementById("bPrev").onclick = function () { advance(-1); };
+  document.getElementById("bWords").onclick = function () { openPanel("words"); };
+  document.getElementById("bMemory").onclick = function () { openPanel("memory"); };
+  document.getElementById("bCat").onclick = function () { openPanel("catechism"); };
+  document.getElementById("bPlay2").onclick = function () { openPanel("play"); };
+  document.getElementById("bPray").onclick = function () { openPanel("pray"); };
+  document.getElementById("bGrow").onclick = function () { openPanel("grow"); };
+  document.getElementById("bAmen").onclick = function () { amen(); burst(); };
+  document.getElementById("bFull").onclick = function () { toggleFull(); hint(); };
+  document.querySelectorAll(".playbar button").forEach(function (b) {
+    if (b.id === "bWords") b.dataset.tab = "words";
+    if (b.id === "bMemory") b.dataset.tab = "memory";
+    if (b.id === "bCat") b.dataset.tab = "catechism";
+    if (b.id === "bGrow") b.dataset.tab = "grow";
+    if (b.id === "bPlay2") b.dataset.tab = "play";
+    if (b.id === "bPray") b.dataset.tab = "pray";
+  });
+
+  /* ---- dust -------------------------------------------------------- */
+  var cv = document.getElementById("dust"), ctx = cv.getContext("2d");
+  var motes = [], w = 0, h = 0, dpr = 1, mx = 0, my = 0, motionOn = true;
+  function resize() {
+    dpr = Math.min(devicePixelRatio || 1, 2);
+    w = cv.width = Math.floor(innerWidth * dpr); h = cv.height = Math.floor(innerHeight * dpr);
+    var want = Math.round(Math.min(120, Math.max(40, innerWidth * innerHeight / 22000)));
+    motes = [];
+    for (var i = 0; i < want; i++) {
+      motes.push({ x: Math.random() * w, y: Math.random() * h,
+        r: (Math.random() * 1.5 + 0.35) * dpr, vy: -(Math.random() * 0.16 + 0.02) * dpr,
+        vx: (Math.random() - 0.5) * 0.05 * dpr, a: Math.random() * 0.3 + 0.05, p: Math.random() * 6.28 });
+    }
+  }
+  addEventListener("resize", resize); resize();
+  function frame(t) {
+    requestAnimationFrame(frame);
+    if (!motionOn || document.hidden) return;
+    mx += ((w / 2) - mx) * 0.004; my += ((h / 2) - my) * 0.004;
+    ctx.clearRect(0, 0, w, h);
+    var rgb = document.documentElement.dataset.theme === "light" ? "43,35,32" : "255,242,222";
+    for (var i = 0; i < motes.length; i++) {
+      var m = motes[i];
+      m.y += m.vy; m.x += m.vx;
+      if (m.y < -6) { m.y = h + 6; m.x = Math.random() * w; }
+      if (m.x < -6) m.x = w + 6; if (m.x > w + 6) m.x = -6;
+      var tw = 0.72 + 0.28 * Math.sin(t / 2400 + m.p);
+      ctx.beginPath();
+      ctx.fillStyle = "rgba(" + rgb + "," + (m.a * tw).toFixed(3) + ")";
+      ctx.arc(m.x + (m.x - mx) * 0.0025, m.y + (m.y - my) * 0.0025, m.r, 0, 6.2832);
+      ctx.fill();
+    }
+  }
+  requestAnimationFrame(frame);
+  function motion(on) {
+    motionOn = on;
+    document.querySelectorAll(".glow,#kb,.progress i").forEach(function (n) {
+      n.style.animationPlayState = on ? "running" : "paused";
+    });
+  }
+
+  /* ---- go ---------------------------------------------------------- */
+  var resume = (!start && store.verse >= 0 && store.verse < pool.length) ? store.verse : at;
+  show(resume, false);
+  at = resume;
+  schedule();
+  if (!BARE && !QUIET) setTimeout(hint, 1400);
+  setTimeout(function () { elHint.classList.add("gone"); }, 9000);
+  if (BARE) document.querySelectorAll(".hud,.progress,.playbar").forEach(function (n) { n.style.display = "none"; });
+  if (QUIET) document.querySelectorAll(".playbar").forEach(function (n) { n.style.display = "none"; });
+  if (OPEN && !QUIET && !BARE) setTimeout(function () { openPanel(OPEN); }, 400);
+
+  window.ScriptureScreensaver = {
+    verses: pool, data: DATA,
+    show: function (i) { clearTimeout(timer); clearTimeout(phase); at = i; show(i, false); if (!paused) schedule(); },
+    next: function () { advance(1); }, prev: function () { advance(-1); },
+    pause: function (p) { setPaused(p === undefined ? !paused : p); }, isPaused: function () { return paused; },
+    open: openPanel, close: closePanel, fullscreen: toggleFull,
+    store: store, site: SITE
+  };
+})();
+</script>
+</body>
+</html>

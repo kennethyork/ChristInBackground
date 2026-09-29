@@ -1,0 +1,207 @@
+#!/bin/sh
+# studytools-wallpaper — put Scripture on the desktop, from studytools.cc
+#
+#   studytools-wallpaper               on the desktop, by the best method this session has
+#   studytools-wallpaper --screensaver full screen, like a screensaver
+#   studytools-wallpaper --video       the video loop on the desktop (mpvpaper, or xwinwrap and mpv)
+#   studytools-wallpaper --stop        take it down again
+#   studytools-wallpaper --where       print where the page and the loop live
+#   studytools-wallpaper --dry-run     say what would be run, and run nothing
+#
+# The page is a single HTML file, so all this does is find a browser and ask it
+# to sit at the bottom of the desktop.  Nothing is installed in your browser
+# profile: it runs in its own profile directory under your data folder.
+set -eu
+
+APP="studytools-wallpaper"
+SELF="$(readlink -f "$0" 2>/dev/null || echo "$0")"
+SELFDIR="$(dirname "$SELF")"
+DATA="${XDG_DATA_HOME:-$HOME/.local/share}/studytools/scripture"
+RUNTIME="${XDG_RUNTIME_DIR:-/tmp}"
+PIDFILE="$RUNTIME/$APP.pid"
+LOGFILE="$RUNTIME/$APP.log"
+DRY=0
+GEOM=""
+
+usage() { sed -n '2,12p' "$SELF" | sed 's/^# \{0,1\}//'; }
+
+# ---------------------------------------------------------------- arguments
+MODE="wallpaper"
+for arg in "$@"; do
+  case "$arg" in
+    --help|-h) usage; exit 0 ;;
+    --screensaver|-s) MODE="screensaver" ;;
+    --video|-v) MODE="video" ;;
+    --stop|-k) MODE="stop" ;;
+    --where) MODE="where" ;;
+    --dry-run) DRY=1 ;;
+    --geom=*) GEOM="${arg#--geom=}" ;;
+    *) echo "$APP: unknown option $arg" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+# ---------------------------------------------------------------- the files
+find_src() {
+  if [ -n "${APPDIR:-}" ] && [ -f "$APPDIR/usr/share/studytools/scripture/index.html" ]; then
+    SRC="$APPDIR/usr/share/studytools/scripture"
+  elif [ -f "$SELFDIR/../share/studytools/scripture/index.html" ]; then
+    SRC="$(readlink -f "$SELFDIR/../share/studytools/scripture")"
+  elif [ -f "/usr/share/studytools/scripture/index.html" ]; then
+    SRC="/usr/share/studytools/scripture"
+  else
+    echo "$APP: cannot find index.html — is the package installed?" >&2
+    exit 1
+  fi
+}
+
+# The page is copied into the user's own folder once, so that it can be edited,
+# so that a path never goes stale when a package is upgraded, and so that a
+# portable build keeps working from a read-only mount.
+install_files() {
+  find_src
+  if [ ! -d "$DATA" ]; then mkdir -p "$DATA"; fi
+  for f in index.html studytools-loop-1080p.mp4; do
+    if [ -f "$SRC/$f" ] && ! cmp -s "$SRC/$f" "$DATA/$f"; then cp -f "$SRC/$f" "$DATA/$f"; fi
+  done
+  PAGE="file://$DATA/index.html"
+  LOOP="$DATA/studytools-loop-1080p.mp4"
+}
+
+find_browser() {
+  for b in chromium chromium-browser google-chrome google-chrome-stable brave-browser microsoft-edge firefox; do
+    if command -v "$b" >/dev/null 2>&1; then BROWSER="$(command -v "$b")"; return 0; fi
+  done
+  return 1
+}
+
+# Flags that keep the window out of the way and out of your normal profile.
+browser_cmd() {                       # $1 = page, $2 = fullscreen|window
+  case "$(basename "$BROWSER")" in
+    firefox*)
+      if [ "$2" = "fullscreen" ]; then echo "$BROWSER --kiosk $1"
+      else echo "$BROWSER --new-window $1"; fi ;;
+    *)
+      base="$BROWSER --user-data-dir=$DATA/profile --no-first-run --no-default-browser-check"
+      base="$base --password-store=basic --disable-session-crashed-bubble --disable-infobars"
+      base="$base --disable-features=Translate,MediaRouter --hide-scrollbars --autoplay-policy=no-user-gesture-required"
+      if [ "$2" = "fullscreen" ]; then echo "$base --kiosk --app=$1"; else echo "$base --app=$1"; fi ;;
+  esac
+}
+
+geometry() {
+  if [ -n "$GEOM" ]; then echo "$GEOM"; return; fi
+  if command -v xrandr >/dev/null 2>&1; then
+    xrandr 2>/dev/null | awk '/\*/{print $1; exit}' || true
+  fi
+}
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+session() { echo "${XDG_SESSION_TYPE:-x11}"; }
+
+run_bg() {                            # run in the background, remember the pid
+  if [ "$DRY" = 1 ]; then echo "$APP: would run: $*" >&2; return 0; fi
+  # shellcheck disable=SC2068
+  setsid "$@" >"$LOGFILE" 2>&1 &
+  echo $! >"$PIDFILE"
+}
+
+stop_it() {
+  stopped=0
+  if [ -f "$PIDFILE" ]; then
+    pid="$(cat "$PIDFILE" 2>/dev/null || true)"
+    if [ -n "${pid:-}" ] && kill -0 "$pid" 2>/dev/null; then
+      kill -TERM "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
+      stopped=1
+      sleep 0.5
+      kill -KILL "-$pid" 2>/dev/null || true
+    fi
+    rm -f "$PIDFILE"
+  fi
+  # anything still running out of this wallpaper's own profile or loop — but
+  # never this script, and never the shell that called it
+  anc=" $$ "
+  p=$$
+  while [ "${p:-0}" -gt 1 ] 2>/dev/null; do
+    p="$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ' || true)"
+    [ -n "${p:-}" ] || break
+    anc="$anc$p "
+  done
+  for pat in "$DATA/profile/" "$DATA/studytools-loop-1080p.mp4"; do
+    for pid in $(pgrep -f "$pat" 2>/dev/null || true); do
+      case "$anc" in *" $pid "*) continue ;; esac
+      kill "$pid" 2>/dev/null && stopped=1 || true
+    done
+  done
+  if [ "$stopped" = 1 ]; then echo "$APP: stopped"; else echo "$APP: nothing was running"; fi
+}
+
+# ---------------------------------------------------------------- the modes
+case "$MODE" in
+  where)
+    install_files
+    echo "page:  $PAGE"
+    echo "files: $DATA"
+    [ -f "$LOOP" ] && echo "loop:  $LOOP"
+    exit 0 ;;
+
+  stop) stop_it; exit 0 ;;
+esac
+
+if ! find_browser; then
+  echo "$APP: no browser found. Install one of: chromium, google-chrome, brave, firefox." >&2
+  exit 1
+fi
+install_files
+
+case "$MODE" in
+  screensaver)
+    cmd="$(browser_cmd "$PAGE" fullscreen)"
+    run_bg sh -c "$cmd"
+    [ "$DRY" = 1 ] || echo "$APP: full screen. --stop to leave it."
+    ;;
+
+  video)
+    if [ "$(session)" = "wayland" ] && have mpvpaper; then
+      run_bg mpvpaper -o "no-audio --loop-file=inf --panscan=1.0" '*' "$LOOP"
+      [ "$DRY" = 1 ] || echo "$APP: video loop on the desktop (mpvpaper). --stop to leave it."
+    elif have xwinwrap && have mpv; then
+      g="$(geometry)"; [ -n "$g" ] || g="1920x1080"
+      run_bg xwinwrap -g "$g+0+0" -ni -s -nf -b -un -argb -- mpv -wid WID --no-audio --loop=inf --no-osc --no-input-default-bindings "$LOOP"
+      [ "$DRY" = 1 ] || echo "$APP: video loop on the desktop (xwinwrap + mpv). --stop to leave it."
+    else
+      echo "$APP: the video loop needs mpvpaper (Wayland) or xwinwrap and mpv (X11)." >&2
+      echo "$APP: falling back to the page itself." >&2
+      cmd="$(browser_cmd "$PAGE" fullscreen)"; run_bg sh -c "$cmd"
+    fi
+    ;;
+
+  wallpaper)
+    if [ "$(session)" = "x11" ] && have xwinwrap; then
+      g="$(geometry)"; [ -n "$g" ] || g="1920x1080"
+      cmd="$(browser_cmd "$PAGE" window)"
+      run_bg xwinwrap -g "$g+0+0" -ni -s -nf -b -un -argb -- $cmd --window-size="${g/x/,}" --window-position=0,0
+      [ "$DRY" = 1 ] || echo "$APP: on the desktop (xwinwrap). --stop to leave it."
+    elif [ "$(session)" = "x11" ] && have wmctrl; then
+      # no xwinwrap: a borderless window kept below everything else
+      cmd="$(browser_cmd "$PAGE" window)"
+      g="$(geometry)"; [ -n "$g" ] || g="1920x1080"
+      run_bg sh -c "$cmd --window-size=${g/x/,} --window-position=0,0 & sleep 5; wmctrl -r 'studytools.cc' -b add,below,skip_taskbar,skip_pager 2>/dev/null || true"
+      [ "$DRY" = 1 ] || echo "$APP: on the desktop, kept below other windows (wmctrl). --stop to leave it."
+      echo "$APP: for a true desktop window, install xwinwrap." >&2
+    else
+      echo "$APP: on $(session) the desktop itself cannot hold a web page."
+      echo "       What does work:"
+      echo "        - GNOME:  the 'Live Wallpaper' extension (mpv)"$'\n'"          then:  $APP --video"
+      echo "        - KDE:    the Wallpaper Engine plugin, pointed at the .zip in this package"
+      echo "        - any:    $APP --screensaver   (full screen; esc or --stop to leave)"
+      echo "        - any:    the loop as an ordinary wallpaper:  $LOOP"
+      echo
+      echo "$APP: running full screen for now."
+      cmd="$(browser_cmd "$PAGE" fullscreen)"; run_bg sh -c "$cmd"
+    fi
+    ;;
+esac
+
+[ "$DRY" = 1 ] || { echo "$APP: log: $LOGFILE"; }
+exit 0

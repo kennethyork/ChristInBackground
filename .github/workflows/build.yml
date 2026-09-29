@@ -1,0 +1,141 @@
+name: build
+
+# Every push builds the wallpaper, the icon, the video loop and all six
+# packages, and hands them over as artifacts.  A tag also publishes them as a
+# Release; main also publishes the page to GitHub Pages.
+
+on:
+  push:
+    branches: [main, master]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write        # to publish a release
+  pages: write           # to publish the page
+  id-token: write        # what deploy-pages needs
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  build:
+    name: wallpaper, video and packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: What the build needs
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            rpm ffmpeg fonts-liberation fonts-dejavu-core
+          python3 -m pip install --quiet --upgrade pip
+          python3 -m pip install --quiet Pillow
+          fc-cache -f >/dev/null 2>&1 || true
+
+      - name: Version
+        id: version
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=0.0.0" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Assemble the wallpaper
+        run: python3 tools/make-wallpaper.py dist/index.html
+
+      - name: Draw the icon
+        run: python3 tools/make-icon.py dist/studytools-wallpaper.png
+
+      - name: Render the video loop
+        run: python3 tools/make-video.py --count 12 --seconds 8
+
+      - name: Build the packages
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: bash tools/make-packages.sh
+
+      - name: Check what came out
+        run: |
+          ls -la dist
+          test -s dist/index.html
+          test -s dist/studytools-wallpaper_*.deb
+          test -s dist/studytools-wallpaper-*.rpm
+          test -s dist/StudyTools-Wallpaper-*.AppImage
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scripture-wallpaper
+          if-no-files-found: error
+          path: |
+            dist/index.html
+            dist/*.mp4
+            dist/*.jpg
+            dist/*.gif
+            dist/*.png
+            dist/*.zip
+            dist/*.deb
+            dist/*.rpm
+            dist/*.AppImage
+            dist/SHA256SUMS
+
+      - name: Lay out the page
+        run: |
+          mkdir -p dist/site
+          cp dist/index.html dist/site/index.html
+          cp dist/thumbnail.jpg dist/site/thumbnail.jpg
+          [ -f dist/studytools-loop-1080p.mp4 ] && cp dist/studytools-loop-1080p.mp4 dist/site/ || true
+
+      - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        with:
+          path: dist/site
+
+  pages:
+    name: publish to GitHub Pages
+    needs: build
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+  release:
+    name: publish a release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: scripture-wallpaper
+          path: dist
+
+      - name: Attach everything to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -e
+          files=$(find dist -maxdepth 1 -type f | sort | tr '\n' ' ')
+          echo "attaching: $files"
+          if ! gh release create "$TAG" \
+                --title "Scripture — a studytools.cc live wallpaper ${TAG}" \
+                --generate-notes $files ; then
+            gh release upload "$TAG" $files --clobber
+          fi

@@ -1,0 +1,14 @@
+{
+  "AppVersion": "1.0.0.0",
+  "Title": "Scripture \u2014 studytools.cc",
+  "Thumbnail": "thumbnail.jpg",
+  "Preview": "preview.gif",
+  "Desc": "Scripture on the desktop: a quiet loop of verses, and when you touch it, the Greek or Hebrew behind any word, a catechism question, a verse game, a candle and a challenge a day. Everything it shows is free to read at studytools.cc.",
+  "Author": "studytools.cc",
+  "License": "MIT",
+  "Contact": "https://github.com/kennethyork/ChristInBackground",
+  "Type": 1,
+  "FileName": "index.html",
+  "Arguments": "",
+  "IsAbsolutePath": false
+}

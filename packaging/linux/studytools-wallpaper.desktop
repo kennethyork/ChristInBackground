@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Scripture on the desktop
+GenericName=Bible wallpaper
+Comment=Put Scripture from studytools.cc on the desktop
+Exec=studytools-wallpaper
+TryExec=studytools-wallpaper
+Icon=studytools-wallpaper
+Terminal=false
+Categories=Utility;Education;
+Keywords=bible;scripture;christian;wallpaper;desktop;
+StartupNotify=false

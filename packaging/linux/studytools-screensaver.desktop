@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Scripture, full screen
+GenericName=Bible screensaver
+Comment=The Scripture screensaver from studytools.cc, full screen
+Exec=studytools-wallpaper --screensaver
+TryExec=studytools-wallpaper
+Icon=studytools-wallpaper
+Terminal=false
+Categories=Utility;Education;
+Keywords=bible;scripture;christian;screensaver;
+StartupNotify=false
